@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FinTrack — Controle de Gastos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #080d17;
+      --bg2:       #0e1525;
+      --bg3:       #141d30;
+      --border:    #1e2d47;
+      --green:     #10b981;
+      --green-dim: #065f46;
+      --yellow:    #f59e0b;
+      --red:       #ef4444;
+      --blue:      #3b82f6;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --mono:      'DM Mono', monospace;
+      --sans:      'Syne', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 240px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 20px;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--green);
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .logo span { color: var(--text); }
+    .logo-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 32px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: all .18s;
+      margin-bottom: 4px;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover { background: var(--bg3); color: var(--text); }
+    .nav-item.active { background: var(--green-dim); color: var(--green); }
+    .nav-icon { font-size: 18px; width: 24px; text-align: center; }
+    .sidebar-bottom { margin-top: auto; }
+    .alert-badge {
+      background: var(--red);
+      color: #fff;
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 2px 6px;
+      border-radius: 99px;
+      margin-left: auto;
+    }
+
+    /* ── MAIN ── */
+    .main {
+      margin-left: 240px;
+      flex: 1;
+      padding: 36px 40px;
+      max-width: calc(100% - 240px);
+    }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 36px;
+    }
+    .page-title { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    .month-picker {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+    }
+    .month-picker select {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+    .month-picker select option { background: var(--bg2); }
+
+    /* ── CARDS ── */
+    .cards-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .card.green::before { background: var(--green); }
+    .card.yellow::before { background: var(--yellow); }
+    .card.red::before { background: var(--red); }
+    .card.blue::before { background: var(--blue); }
+    .card-label { font-size: 11px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .card-value { font-size: 28px; font-weight: 800; font-family: var(--mono); letter-spacing: -1px; }
+    .card-value.green { color: var(--green); }
+    .card-value.yellow { color: var(--yellow); }
+    .card-value.red { color: var(--red); }
+    .card-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* ── CHARTS ── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+    .chart-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+    .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-family: var(--mono); }
+    .chart-wrap { position: relative; height: 230px; }
+
+    /* ── CATEGORIES TABLE ── */
+    .cat-table { width: 100%; border-collapse: collapse; }
+    .cat-table th { font-size: 11px; color: var(--muted); font-family: var(--mono); text-align: left; padding: 0 12px 12px; text-transform: uppercase; letter-spacing: 1px; }
+    .cat-table td { padding: 12px; border-top: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+    .cat-row:hover td { background: var(--bg3); }
+    .progress-bar { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; margin-top: 5px; }
+    .progress-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
+
+    /* ── FORM ── */
+    .form-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 30px;
+      max-width: 560px;
+    }
+    .form-grid { display: grid; gap: 16px; }
+    .form-group label { display: block; font-size: 12px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color .18s;
+    }
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--green); }
+    .form-group select option { background: var(--bg2); }
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      transition: all .18s;
+    }
+    .btn-primary { background: var(--green); color: #000; }
+    .btn-primary:hover { background: #059669; transform: translateY(-1px); }
+    .btn-danger { background: var(--red); color: #fff; padding: 6px 12px; font-size: 12px; }
+    .btn-ghost { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--green); }
+
+    /* ── GASTOS LIST ── */
+    .gastos-list { display: flex; flex-direction: column; gap: 8px; }
+    .gasto-item {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: border-color .18s;
+    }
+    .gasto-item:hover { border-color: var(--muted); }
+    .gasto-icone { font-size: 22px; min-width: 36px; text-align: center; }
+    .gasto-info { flex: 1; }
+    .gasto-desc { font-size: 15px; font-weight: 600; }
+    .gasto-meta { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+    .gasto-valor { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--red); white-space: nowrap; }
+    .gasto-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .18s; }
+    .gasto-item:hover .gasto-actions { opacity: 1; }
+
+    /* ── ALERTAS ── */
+    .alertas-list { display: flex; flex-direction: column; gap: 10px; }
+    .alerta-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 16px 18px;
+      border-radius: 10px;
+      border-left: 4px solid;
+      background: var(--bg2);
+    }
+    .alerta-item.critico { border-color: var(--red); }
+    .alerta-item.aviso { border-color: var(--yellow); }
+    .alerta-item.info { border-color: var(--blue); }
+    .alerta-item.lido { opacity: .45; }
+    .alerta-msg { font-size: 14px; flex: 1; }
+    .alerta-time { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+
+    /* ── IA ── */
+    .ia-box {
+      background: var(--bg2);
+      border: 1px solid var(--green-dim);
+      border-radius: 14px;
+      padding: 28px;
+    }
+    .ia-response {
+      background: var(--bg3);
+      border-radius: 10px;
+      padding: 20px;
+      font-size: 15px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      margin-top: 18px;
+      min-height: 80px;
+      font-family: var(--mono);
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── EMPTY STATE ── */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { font-size: 15px; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      background: var(--bg3);
+      border: 1px solid var(--green);
+      color: var(--green);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-family: var(--mono);
+      font-size: 13px;
+      z-index: 9999;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all .3s ease;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.error { border-color: var(--red); color: var(--red); }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 30px;
+      width: 460px;
+      max-width: 95vw;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .sidebar { width: 60px; padding: 20px 8px; }
+      .logo, .logo-sub, .nav-item span { display: none; }
+      .nav-item { justify-content: center; padding: 12px; }
+      .main { margin-left: 60px; max-width: calc(100% - 60px); padding: 24px 16px; }
+      .cards-row { grid-template-columns: repeat(2, 1fr); }
+      .charts-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">Fin<span>Track</span></div>
+  <div class="logo-sub">controle financeiro</div>
+
+  <button class="nav-item active" onclick="showPage('dashboard')">
+    <span class="nav-icon">📊</span><span>Dashboard</span>
+  </button>
+  <button class="nav-item" onclick="showPage('registrar')">
+    <span class="nav-icon">➕</span><span>Registrar Gasto</span>
+  </button>
+  <button class="nav-item" onclick="showPage('gastos')">
+    <span class="nav-icon">📋</span><span>Meus Gastos</span>
+  </button>
+  <button class="nav-item" onclick="showPage('ia')">
+    <span class="nav-icon">🤖</span><span>Análise IA</span>
+  </button>
+
+  <div class="sidebar-bottom">
+    <button class="nav-item" id="nav-alertas" onclick="showPage('alertas')">
+      <span class="nav-icon">🔔</span><span>Alertas</span>
+      <span class="alert-badge" id="badge-alertas" style="display:none">0</span>
+    </button>
+    <button class="nav-item" onclick="showPage('categorias')">
+      <span class="nav-icon">🏷️</span><span>Categorias</span>
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="topbar">
+      <div class="page-title">Dashboard</div>
+      <div class="month-picker">
+        <span style="color:var(--muted);font-size:12px;font-family:var(--mono)">📅</span>
+        <select id="sel-mes" onchange="loadDashboard()">
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+        <select id="sel-ano" onchange="loadDashboard()"></select>
+      </div>
+    </div>
+
+    <div class="cards-row">
+      <div class="card green">
+        <div class="card-label">Total no Mês</div>
+        <div class="card-value green" id="d-total">R$ 0,00</div>
+        <div class="card-sub" id="d-qtd">0 transações</div>
+      </div>
+      <div class="card yellow">
+        <div class="card-label">Maior Categoria</div>
+        <div class="card-value yellow" id="d-maior-cat">—</div>
+        <div class="card-sub" id="d-maior-val"></div>
+      </div>
+      <div class="card red">
+        <div class="card-label">Limites Estourados</div>
+        <div class="card-value red" id="d-estourados">0</div>
+        <div class="card-sub">categorias acima do limite</div>
+      </div>
+      <div class="card blue">
+        <div class="card-label">Alertas Pendentes</div>
+        <div class="card-value" id="d-alertas" style="color:var(--blue)">0</div>
+        <div class="card-sub">não lidos</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Gastos por Dia</div>
+        <div class="chart-wrap"><canvas id="chart-linha"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Por Categoria</div>
+        <div class="chart-wrap"><canvas id="chart-pizza"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Uso dos Limites por Categoria</div>
+      <table class="cat-table" id="cat-limits-table">
+        <thead><tr>
+          <th>Categoria</th><th>Gasto</th><th>Limite</th><th>Uso</th>
+        </tr></thead>
+        <tbody id="cat-limits-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- REGISTRAR -->
+  <div class="page" id="page-registrar">
+    <div class="topbar"><div class="page-title">Registrar Gasto</div></div>
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Descrição</label>
+          <input type="text" id="f-desc" placeholder="Ex: Almoço no restaurante..." />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label>Valor (R$)</label>
+            <input type="number" id="f-valor" step="0.01" min="0" placeholder="0,00" />
+          </div>
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" id="f-data" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select id="f-cat"></select>
+        </div>
+        <button class="btn btn-primary" onclick="registrarGasto()">✔ Salvar Gasto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GASTOS -->
+  <div class="page" id="page-gastos">
+    <div class="topbar">
+      <div class="page-title">Meus Gastos</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <select id="filtro-cat" class="month-picker" style="padding:8px 14px" onchange="loadGastos()">
+          <option value="">Todas categorias</option>
+        </select>
+      </div>
+    </div>
+    <div class="gastos-list" id="gastos-list">
+      <div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Carregando...</div></div>
+    </div>
+  </div>
+
+  <!-- IA -->
+  <div class="page" id="page-ia">
+    <div class="topbar"><div class="page-title">Análise com IA</div></div>
+    <div class="ia-box">
+      <p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px">
+        Clique em <strong style="color:var(--green)">Analisar</strong> para receber uma análise personalizada dos seus gastos do mês atual com insights e dicas geradas por Inteligência Artificial.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="analisarIA()">🤖 Analisar Gastos do Mês</button>
+        <button class="btn btn-ghost" onclick="dicaIA()">💡 Dica do Dia</button>
+      </div>
+      <div class="ia-response" id="ia-response" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ALERTAS -->
+  <div class="page" id="page-alertas">
+    <div class="topbar">
+      <div class="page-title">Alertas</div>
+      <button class="btn btn-ghost" onclick="limparAlertas()">🗑 Limpar Lidos</button>
+    </div>
+    <div class="alertas-list" id="alertas-list">
+      <div class="empty"><div class="empty-icon">🔔</div><div class="empty-text">Sem alertas</div></div>
+    </div>
+  </div>
+
+  <!-- CATEGORIAS -->
+  <div class="page" id="page-categorias">
+    <div class="topbar">
+      <div class="page-title">Categorias</div>
+      <button class="btn btn-primary" onclick="openModalCat()">+ Nova Categoria</button>
+    </div>
+    <div class="gastos-list" id="cats-list"></div>
+  </div>
+
+</main>
+
+<!-- MODAL CATEGORIA -->
+<div class="modal-overlay" id="modal-cat">
+  <div class="modal">
+    <div class="modal-title">Nova Categoria</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nome</label><input type="text" id="mc-nome" /></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group"><label>Ícone (emoji)</label><input type="text" id="mc-icone" placeholder="🏷️" maxlength="2"/></div>
+        <div class="form-group"><label>Cor</label><input type="color" id="mc-cor" value="#10b981" style="padding:4px;height:42px"/></div>
+      </div>
+      <div class="form-group"><label>Limite Mensal (R$)</label><input type="number" id="mc-limite" step="0.01" min="0" placeholder="0,00"/></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="salvarCategoria()">Salvar</button>
+        <button class="btn btn-ghost" onclick="closeModalCat()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR GASTO -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <div class="modal-title">Editar Gasto</div>
+    <div class="form-grid">
+      <input type="hidden" id="edit-id">
+      <div class="form-group"><label>Descrição</label><input type="text" id="edit-desc"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group"><label>Valor</label><input type="number" id="edit-valor" step="0.01"/></div>
+        <div class="form-group"><label>Data</label><input type="date" id="edit-data"/></div>
+      </div>
+      <div class="form-group"><label>Categoria</label><select id="edit-cat"></select></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="salvarEdicao()">Salvar</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('modal-edit').classList.remove('open')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

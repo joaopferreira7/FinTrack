@@ -1,0 +1,14 @@
+version: '3.9'
+
+services:
+  fintrack:
+    build: .
+    container_name: fintrack_app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./fintrack.db:/app/fintrack.db
+    environment:
+      - SECRET_KEY=fintrack-secret-production
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: unless-stopped
