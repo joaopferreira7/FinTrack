@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────
+# FinTrack — .gitignore
+# ─────────────────────────────────────────────
+
+# Variáveis de ambiente (NUNCA versionar!)
+.env
+
+# Banco de dados local
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+.env/
+
+# Dependências Node (caso use ferramentas JS localmente)
+node_modules/
+
+# Distribuição / build Python
+dist/
+build/
+*.egg-info/
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker volumes locais
+postgres_data/
