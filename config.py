@@ -12,4 +12,4 @@ class Config:
         'sqlite:///' + os.path.join(BASE_DIR, 'fintrack.db')
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+    GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')

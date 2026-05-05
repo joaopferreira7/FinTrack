@@ -2,6 +2,7 @@
 let chartLinha = null;
 let chartPizza = null;
 let categorias = [];
+let chatHistorico = [];
 const now = new Date();
 
 /* ── INIT ── */
@@ -14,6 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCatsList();
   });
   document.getElementById('f-data').value = now.toISOString().slice(0, 10);
+
+  // Enviar chat com Enter
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) {
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChat(); }
+    });
+  }
 });
 
 /* ── NAVIGATION ── */
@@ -143,7 +152,10 @@ async function loadDashboard() {
   badge.textContent = d.alertas_pendentes;
   badge.style.display = d.alertas_pendentes > 0 ? 'inline-block' : 'none';
 
-  // maior categoria
+  // ── FIX: sempre limpa antes de preencher ──
+  document.getElementById('d-maior-cat').textContent = '—';
+  document.getElementById('d-maior-val').textContent = '—';
+
   if (d.por_categoria.length) {
     const maior = d.por_categoria.reduce((a, b) => a.total > b.total ? a : b);
     document.getElementById('d-maior-cat').textContent = `${maior.categoria.icone} ${maior.categoria.nome}`;
@@ -280,6 +292,8 @@ async function registrarGasto() {
     toast('✔ Gasto registrado!');
     document.getElementById('f-desc').value = '';
     document.getElementById('f-valor').value = '';
+    // ── FIX: atualiza lista de gastos também ──
+    loadGastos();
     loadDashboard();
     loadAlertas();
   } else {
@@ -380,6 +394,69 @@ async function dicaIA() {
   const r = await fetch('/api/ia/dica');
   const d = await r.json();
   box.textContent = '💡 ' + d.dica;
+}
+
+/* ── CHAT IA ── */
+function appendChatMsg(role, text) {
+  const msgs = document.getElementById('chat-msgs');
+  const div = document.createElement('div');
+  div.className = 'chat-msg chat-' + role;
+  div.textContent = text;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function enviarChat() {
+  const input = document.getElementById('chat-input');
+  const mensagem = input.value.trim();
+  if (!mensagem) return;
+  input.value = '';
+  input.disabled = true;
+
+  appendChatMsg('user', mensagem);
+
+  // placeholder
+  const msgs = document.getElementById('chat-msgs');
+  const placeholder = document.createElement('div');
+  placeholder.className = 'chat-msg chat-assistant chat-loading';
+  placeholder.innerHTML = '<span class="spinner"></span>';
+  msgs.appendChild(placeholder);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const r = await fetch('/api/ia/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mes: getMes(),
+        ano: getAno(),
+        historico: chatHistorico,
+        mensagem,
+      }),
+    });
+    const d = await r.json();
+    placeholder.remove();
+
+    const resposta = d.resposta || d.erro || 'Erro desconhecido.';
+    appendChatMsg('assistant', resposta);
+
+    chatHistorico.push({ role: 'user', content: mensagem });
+    chatHistorico.push({ role: 'assistant', content: resposta });
+    // manter só últimos 10 turnos
+    if (chatHistorico.length > 20) chatHistorico = chatHistorico.slice(-20);
+  } catch (e) {
+    placeholder.remove();
+    appendChatMsg('assistant', '❌ Erro ao conectar com a IA.');
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+function limparChat() {
+  chatHistorico = [];
+  const msgs = document.getElementById('chat-msgs');
+  msgs.innerHTML = '<div class="chat-msg chat-assistant">👋 Olá! Sou o FinBot, seu assistente financeiro. Posso analisar seus gastos, responder dúvidas e dar dicas personalizadas. Como posso ajudar?</div>';
 }
 
 /* ── UTILS ── */

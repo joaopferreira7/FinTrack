@@ -1,5 +1,4 @@
-import json
-import urllib.request
+import requests
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 from app import db
@@ -7,35 +6,71 @@ from app.models import Gasto, Categoria
 
 ia_bp = Blueprint('ia', __name__)
 
+GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+GROQ_MODEL   = 'llama-3.3-70b-versatile'
 
-def _chamar_claude(prompt: str) -> str:
-    """Chama a API do Claude Sonnet e retorna a resposta em texto."""
-    api_key = current_app.config.get('ANTHROPIC_API_KEY', '')
+
+def _chamar_groq(messages: list, max_tokens: int = 1000) -> str:
+    """Chama a API do Groq e retorna a resposta em texto."""
+    api_key = current_app.config.get('GROQ_API_KEY', '')
     if not api_key:
-        return "⚠️ Configure a variável ANTHROPIC_API_KEY para usar análises com IA."
+        return "⚠️ Configure a variável GROQ_API_KEY no arquivo .env para usar análises com IA."
 
-    payload = json.dumps({
-        "model": "claude-sonnet-4-20250514",
-        "max_tokens": 1000,
-        "messages": [{"role": "user", "content": prompt}]
-    }).encode('utf-8')
-
-    req = urllib.request.Request(
-        'https://api.anthropic.com/v1/messages',
-        data=payload,
-        headers={
-            'Content-Type': 'application/json',
-            'x-api-key': api_key,
-            'anthropic-version': '2023-06-01',
-        },
-        method='POST'
-    )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            return data['content'][0]['text']
+        resp = requests.post(
+            GROQ_API_URL,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}',
+            },
+            json={
+                "model": GROQ_MODEL,
+                "max_tokens": max_tokens,
+                "messages": messages,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()['choices'][0]['message']['content']
+    except requests.HTTPError as e:
+        return f"Erro HTTP {resp.status_code}: {resp.text}"
     except Exception as e:
         return f"Erro ao contatar a IA: {str(e)}"
+
+
+def _montar_contexto_financeiro(mes: int, ano: int) -> dict:
+    """Monta resumo financeiro do mês para contextualizar a IA."""
+    gastos = Gasto.query.filter(
+        db.extract('month', Gasto.data) == mes,
+        db.extract('year',  Gasto.data) == ano,
+    ).all()
+
+    total = sum(g.valor for g in gastos)
+    por_cat = {}
+    for g in gastos:
+        nome = g.categoria.nome
+        por_cat[nome] = por_cat.get(nome, 0) + g.valor
+
+    categorias_texto = '\n'.join(
+        f"  - {nome}: R${valor:.2f} ({valor/total*100:.1f}%)"
+        for nome, valor in sorted(por_cat.items(), key=lambda x: -x[1])
+    ) if total > 0 else "  Nenhum gasto registrado."
+
+    limites = {c.nome: c.limite_mensal for c in Categoria.query.all() if c.limite_mensal > 0}
+    alertas = []
+    for nome, valor in por_cat.items():
+        if nome in limites and limites[nome] > 0:
+            pct = valor / limites[nome] * 100
+            if pct >= 80:
+                alertas.append(f"{nome}: {pct:.0f}% do limite utilizado")
+
+    return {
+        'mes': mes, 'ano': ano,
+        'total': total,
+        'qtd': len(gastos),
+        'por_cat_texto': categorias_texto,
+        'alertas': alertas,
+    }
 
 
 @ia_bp.route('/analisar', methods=['POST'])
@@ -49,61 +84,88 @@ def analisar_gastos():
     mes = body.get('mes', agora.month)
     ano = body.get('ano', agora.year)
 
-    gastos = Gasto.query.filter(
-        db.extract('month', Gasto.data) == mes,
-        db.extract('year',  Gasto.data) == ano,
-    ).all()
-
-    if not gastos:
+    ctx = _montar_contexto_financeiro(mes, ano)
+    if ctx['total'] == 0:
         return jsonify({'analise': 'Nenhum gasto registrado neste mês para analisar.'}), 200
 
-    total = sum(g.valor for g in gastos)
-
-    por_cat = {}
-    for g in gastos:
-        nome = g.categoria.nome
-        por_cat[nome] = por_cat.get(nome, 0) + g.valor
-
-    categorias_texto = '\n'.join(
-        f"  - {nome}: R${valor:.2f} ({valor/total*100:.1f}%)"
-        for nome, valor in sorted(por_cat.items(), key=lambda x: -x[1])
+    system_msg = (
+        "Você é um consultor financeiro pessoal amigável e direto. "
+        "Responda sempre em português brasileiro. Não use markdown excessivo."
     )
+    user_msg = f"""Analise os gastos de {mes:02d}/{ano}:
 
-    limites = {c.nome: c.limite_mensal for c in Categoria.query.all() if c.limite_mensal > 0}
-    alertas_limite = []
-    for nome, valor in por_cat.items():
-        if nome in limites and limites[nome] > 0:
-            pct = valor / limites[nome] * 100
-            if pct >= 80:
-                alertas_limite.append(f"{nome}: {pct:.0f}% do limite utilizado")
-
-    prompt = f"""Você é um consultor financeiro pessoal amigável e direto. Analise os gastos abaixo e forneça um feedback em português brasileiro.
-
-GASTOS DE {mes:02d}/{ano}:
-Total gasto: R${total:.2f}
-Quantidade de transações: {len(gastos)}
+Total gasto: R${ctx['total']:.2f}
+Transações: {ctx['qtd']}
 
 Por categoria:
-{categorias_texto}
+{ctx['por_cat_texto']}
 
-{"Limites próximos ou ultrapassados: " + ", ".join(alertas_limite) if alertas_limite else "Todos os limites estão sob controle."}
+{("Limites próximos ou ultrapassados: " + ", ".join(ctx['alertas'])) if ctx['alertas'] else "Todos os limites sob controle."}
 
 Forneça:
-1. Uma avaliação geral dos gastos (2-3 frases)
-2. O ponto mais preocupante (1-2 frases)
-3. 2 dicas práticas e específicas para economizar
-4. Uma mensagem motivacional curta
+1. Avaliação geral (2-3 frases)
+2. Ponto mais preocupante (1-2 frases)
+3. 2 dicas práticas para economizar
+4. Mensagem motivacional curta"""
 
-Seja direto, use linguagem informal mas profissional. Não use markdown excessivo."""
-
-    analise = _chamar_claude(prompt)
+    analise = _chamar_groq([
+        {"role": "system", "content": system_msg},
+        {"role": "user",   "content": user_msg},
+    ])
     return jsonify({'analise': analise, 'mes': mes, 'ano': ano}), 200
 
 
 @ia_bp.route('/dica', methods=['GET'])
 def dica_do_dia():
     """Retorna uma dica financeira rápida gerada pela IA."""
-    prompt = ("Dê uma dica financeira prática e objetiva em 2-3 frases, "
-              "em português brasileiro informal. Seja criativo e útil para o dia a dia.")
-    dica = _chamar_claude(prompt)
+    dica = _chamar_groq([{
+        "role": "user",
+        "content": ("Dê uma dica financeira prática e objetiva em 2-3 frases, "
+                    "em português brasileiro informal. Seja criativo e útil.")
+    }], max_tokens=300)
     return jsonify({'dica': dica}), 200
+
+
+@ia_bp.route('/chat', methods=['POST'])
+def chat():
+    """
+    Chat interativo com IA financeira.
+    Body JSON: {
+        mes (int), ano (int),
+        historico: [ { role: "user"|"assistant", content: str } ],
+        mensagem: str
+    }
+    """
+    body = request.get_json() or {}
+    agora = datetime.utcnow()
+    mes = body.get('mes', agora.month)
+    ano = body.get('ano', agora.year)
+    historico = body.get('historico', [])
+    mensagem = body.get('mensagem', '').strip()
+
+    if not mensagem:
+        return jsonify({'erro': 'Mensagem vazia'}), 400
+
+    ctx = _montar_contexto_financeiro(mes, ano)
+
+    system_msg = f"""Você é o FinBot, assistente financeiro pessoal do FinTrack. \
+Responda sempre em português brasileiro de forma clara e amigável. \
+Não use markdown excessivo — apenas texto simples com emojis quando adequado.
+
+Contexto financeiro atual do usuário ({mes:02d}/{ano}):
+- Total gasto: R${ctx['total']:.2f} em {ctx['qtd']} transações
+- Por categoria:
+{ctx['por_cat_texto']}
+{("- Alertas: " + "; ".join(ctx['alertas'])) if ctx['alertas'] else "- Todos os limites sob controle."}
+
+Responda perguntas sobre finanças pessoais, análise de gastos e dicas de economia."""
+
+    # Montar histórico (máx. 10 turnos para não estourar tokens)
+    messages = [{"role": "system", "content": system_msg}]
+    for h in historico[-10:]:
+        if h.get('role') in ('user', 'assistant') and h.get('content'):
+            messages.append({"role": h['role'], "content": h['content']})
+    messages.append({"role": "user", "content": mensagem})
+
+    resposta = _chamar_groq(messages, max_tokens=600)
+    return jsonify({'resposta': resposta}), 200
