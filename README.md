@@ -12,8 +12,10 @@ Sistema web para rastreamento e análise de gastos pessoais, com categorização
 git clone <repo>
 cd fintrack
 
-# 2. (Opcional) Configure a API do Claude para análises com IA
-export ANTHROPIC_API_KEY=sua_chave_aqui
+# 2. (Opcional) Configure a API do Groq para análises com IA
+export GROQ_API_KEY=sua_chave_aqui
+# No Windows PowerShell (opcional):
+# $env:GROQ_API_KEY="sua_chave_aqui"
 
 # 3. Suba o container
 docker compose up --build
@@ -40,7 +42,7 @@ fintrack/
 │       ├── gastos.py       # CRUD de gastos + alertas automáticos
 │       ├── categorias.py   # CRUD de categorias
 │       ├── dashboard.py    # Analytics e alertas
-│       ├── ia.py           # Integração Claude API
+│       ├── ia.py           # Integração Groq API (usa GROQ_API_KEY)
 │       └── views.py        # Serve o frontend
 ├── templates/index.html    # SPA responsiva (tema dark fintech)
 ├── static/js/app.js        # Lógica frontend (Vanilla JS + Chart.js)
@@ -142,7 +144,7 @@ fintrack/
 
 | Método | Endpoint          | Descrição                              |
 |--------|-------------------|----------------------------------------|
-| POST   | `/api/ia/analisar`| Análise dos gastos do mês com Claude   |
+| POST   | `/api/ia/analisar`| Análise dos gastos do mês com Groq     |
 | GET    | `/api/ia/dica`    | Dica financeira gerada por IA          |
 
 **POST /api/ia/analisar — Body:**
@@ -159,7 +161,7 @@ fintrack/
 - ✅ Dashboard com gráfico de linha (gastos por dia) e pizza (por categoria)
 - ✅ Limites mensais por categoria com barra de progresso
 - ✅ **Alertas automáticos** ao atingir 80% e 100% do limite
-- ✅ Análise de gastos com **Claude AI** (dicas e insights personalizados)
+- ✅ Análise de gastos com **Groq (Llama 3.3)** (dicas e insights personalizados)
 - ✅ Interface responsiva (dark theme fintech)
 - ✅ Containerização com Docker
 
@@ -170,10 +172,10 @@ fintrack/
 Ao clicar em **"Analisar Gastos do Mês"**, o sistema:
 1. Coleta todos os gastos do mês atual
 2. Calcula totais por categoria e percentuais de uso dos limites
-3. Envia um prompt estruturado para o **Claude Sonnet**
+3. Envia um prompt estruturado para o **Groq (Llama 3.3)**
 4. Exibe na tela: avaliação geral, pontos críticos, dicas práticas e mensagem motivacional
 
-Requer `ANTHROPIC_API_KEY` configurada (via variável de ambiente ou `.env`).
+Requer `GROQ_API_KEY` configurada (via variável de ambiente ou `.env`).
 
 ---
 
@@ -184,7 +186,7 @@ Requer `ANTHROPIC_API_KEY` configurada (via variável de ambiente ou `.env`).
 | Backend     | Python 3.12 + Flask 3.0       |
 | ORM         | SQLAlchemy 2.0                 |
 | Banco       | SQLite (dev) / PostgreSQL (prod)|
-| IA          | Anthropic Claude Sonnet API    |
+| IA          | Groq (Llama 3.3, via Groq API)  |
 | Frontend    | HTML5 + CSS3 + Vanilla JS      |
 | Gráficos    | Chart.js 4                     |
 | Container   | Docker + Docker Compose        |

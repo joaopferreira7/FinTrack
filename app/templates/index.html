@@ -412,6 +412,65 @@
     }
     .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
 
+    /* ── MODAL CONFIRMAÇÃO DELETE ── */
+    .modal-delete .modal {
+      width: 380px;
+      text-align: center;
+      padding: 36px 30px 28px;
+    }
+    .delete-icon {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: rgba(239,68,68,.12);
+      border: 2px solid rgba(239,68,68,.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      margin: 0 auto 20px;
+    }
+    .delete-title {
+      font-size: 18px; font-weight: 700;
+      color: var(--fg);
+      margin-bottom: 8px;
+    }
+    .delete-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .delete-item-name {
+      font-size: 13px;
+      color: var(--fg);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      margin: 0 auto 24px;
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--mono);
+    }
+    .delete-actions {
+      display: flex; gap: 10px; justify-content: center;
+    }
+    .btn-confirm-delete {
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      font-family: inherit;
+    }
+    .btn-confirm-delete:hover { opacity: .85; }
+    .btn-confirm-delete:active { transform: scale(.97); }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       .sidebar { width: 60px; padding: 20px 8px; }
@@ -655,6 +714,20 @@
         <button class="btn btn-primary" onclick="salvarEdicao()">Salvar</button>
         <button class="btn btn-ghost" onclick="document.getElementById('modal-edit').classList.remove('open')">Cancelar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR DELETE -->
+<div class="modal-overlay modal-delete" id="modal-delete">
+  <div class="modal">
+    <div class="delete-icon">🗑️</div>
+    <div class="delete-title">Remover gasto?</div>
+    <div class="delete-subtitle">Essa ação não pode ser desfeita.</div>
+    <div class="delete-item-name" id="delete-item-label">—</div>
+    <div class="delete-actions">
+      <button class="btn btn-ghost" onclick="fecharModalDelete()">Cancelar</button>
+      <button class="btn-confirm-delete" onclick="confirmarDelete()">Sim, remover</button>
     </div>
   </div>
 </div>

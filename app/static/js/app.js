@@ -97,7 +97,7 @@ async function loadCatsList() {
         <div class="gasto-meta" style="color:${c.cor}">limite: R$ ${fmtNum(c.limite_mensal)}</div>
       </div>
       <div class="gasto-actions">
-        <button class="btn btn-danger" onclick="deletarCategoria(${c.id})">🗑</button>
+        <button class=\"btn btn-danger\" data-id="${c.id}" data-label="${c.icone} ${c.nome}" data-type="categoria" onclick=\"abrirModalDelete(this)\">🗑</button>
       </div>
     </div>
   `).join('');
@@ -130,8 +130,13 @@ async function salvarCategoria() {
   }
 }
 
+async function _executarDeletarCategoria(id) {
+  const r = await fetch(`/api/categorias/${id}`, { method: 'DELETE' });
+  if (r.ok) { toast('Categoria removida'); await loadCategorias(); loadCatsList(); }
+  else toast('Erro ao remover categoria', true);
+}
+
 async function deletarCategoria(id) {
-  if (!confirm('Remover esta categoria e todos seus gastos?')) return;
   const r = await fetch(`/api/categorias/${id}`, { method: 'DELETE' });
   if (r.ok) { toast('Categoria removida'); await loadCategorias(); loadCatsList(); }
   else toast('Erro ao remover categoria', true);
@@ -270,7 +275,7 @@ async function loadGastos() {
       <div class="gasto-valor">- R$ ${fmtNum(g.valor)}</div>
       <div class="gasto-actions">
         <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="abrirEdicao(${g.id},'${g.descricao}',${g.valor},'${g.data}',${g.categoria_id})">✏</button>
-        <button class="btn btn-danger" onclick="deletarGasto(${g.id})">🗑</button>
+        <button class=\"btn btn-danger\" data-id="${g.id}" data-label="${g.descricao}" data-type="gasto" onclick=\"abrirModalDelete(this)\">🗑</button>
       </div>
     </div>
   `).join('');
@@ -328,8 +333,48 @@ async function salvarEdicao() {
   } else toast('Erro ao atualizar', true);
 }
 
+/* ── MODAL DELETE ── */
+let _deleteId = null;
+let _deleteType = null;
+
+function abrirModalDelete(btn) {
+  const id    = btn.dataset.id;
+  const label = btn.dataset.label;
+  const type  = btn.dataset.type;
+  _deleteId   = id;
+  _deleteType = type;
+  const titulo   = type === 'gasto' ? 'Remover gasto?' : 'Remover categoria?';
+  const subtitulo = type === 'gasto'
+    ? 'Essa ação não pode ser desfeita.'
+    : 'Isso irá remover a categoria e <strong>todos os gastos</strong> vinculados a ela.';
+  document.querySelector('#modal-delete .delete-title').textContent = titulo;
+  document.querySelector('#modal-delete .delete-subtitle').innerHTML = subtitulo;
+  document.getElementById('delete-item-label').textContent = label;
+  document.getElementById('modal-delete').classList.add('open');
+}
+
+function fecharModalDelete() {
+  document.getElementById('modal-delete').classList.remove('open');
+  _deleteId = null;
+  _deleteType = null;
+}
+
+async function confirmarDelete() {
+  if (!_deleteId || !_deleteType) return;
+  const id   = _deleteId;    // salva antes de fechar
+  const type = _deleteType;
+  fecharModalDelete();
+  if (type === 'gasto') await _executarDeletarGasto(id);
+  else await _executarDeletarCategoria(id);
+}
+
+async function _executarDeletarGasto(id) {
+  const r = await fetch(`/api/gastos/${id}`, { method: 'DELETE' });
+  if (r.ok) { toast('Gasto removido'); loadGastos(); loadDashboard(); }
+  else toast('Erro ao remover', true);
+}
+
 async function deletarGasto(id) {
-  if (!confirm('Remover este gasto?')) return;
   const r = await fetch(`/api/gastos/${id}`, { method: 'DELETE' });
   if (r.ok) { toast('Gasto removido'); loadGastos(); loadDashboard(); }
   else toast('Erro ao remover', true);

@@ -10,5 +10,5 @@ services:
       - ./fintrack.db:/app/fintrack.db
     environment:
       - SECRET_KEY=fintrack-secret-production
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
     restart: unless-stopped
