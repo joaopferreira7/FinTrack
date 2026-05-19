@@ -29,6 +29,8 @@ pip install -r requirements.txt
 python run.py
 ```
 
+> Observação: existe um arquivo `.env.example` com as variáveis necessárias. Copie para `.env` e preencha os valores (ex.: `SECRET_KEY`, `DATABASE_URL`, `GROQ_API_KEY`).
+
 ---
 
 ## 🏗️ Arquitetura
